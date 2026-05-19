@@ -10,7 +10,7 @@ except Exception:
     pass
 
 BASE = "https://ilinkai.weixin.qq.com"
-CONFIG = os.path.expanduser("~/.cc-go/config.json")
+CONFIG = os.path.expanduser("~/.codex-go/config.json")
 
 def echo(msg):
     print(msg, flush=True)

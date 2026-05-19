@@ -9,7 +9,7 @@ try:
 except Exception:
     pass
 
-CONFIG = os.path.expanduser("~/.cc-go/config.json")
+CONFIG = os.path.expanduser("~/.codex-go/config.json")
 
 def load_cfg():
     with open(CONFIG, encoding="utf-8") as f:

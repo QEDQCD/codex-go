@@ -22,7 +22,7 @@ Thumbs.db
 
 # Web
 web/node_modules/
-cmd/cc-go/web-dist/
+cmd/codex-go/web-dist/
 
 # Config (user-specific)
 .cc-go/

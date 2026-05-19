@@ -85,7 +85,7 @@ cd web && npm install
 npm run build
 
 # 构建 Go 二进制文件
-cd .. && go build -o codex-go ./cmd/cc-go/
+cd .. && go build -o codex-go ./cmd/codex-go/
 ```
 
 ### 运行

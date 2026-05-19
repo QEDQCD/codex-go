@@ -125,7 +125,7 @@ Base URL: `https://ilinkai.weixin.qq.com`（扫码后可能返回动态 `baseurl
 
 **注意**:
 - `from_user_id` 固定为空字符串，服务端自动填充
-- `client_id` 用于去重/幂等，前缀可以是任意标识（参考实现用 `openclaw-weixin-` 或 `cc-go-`）
+- `client_id` 用于去重/幂等，前缀可以是任意标识（参考实现用 `openclaw-weixin-` 或 `codex-go-`）
 - **10 条消息限制**: 用户发一条消息后，机器人最多回复 10 条。超过后服务端拒绝
 
 **响应**: 空对象 `{}`
@@ -234,7 +234,7 @@ Authorization: Bearer <bot_token>
   "msg": {
     "from_user_id": "",
     "to_user_id": "xxx@im.wechat",
-    "client_id": "cc-go-xxxxxxxx",
+    "client_id": "codex-go-xxxxxxxx",
     "message_type": 2,
     "message_state": 2,
     "context_token": "<从接收消息中获取>",

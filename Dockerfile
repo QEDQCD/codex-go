@@ -10,8 +10,8 @@ ENV GOSUMDB=sum.golang.google.cn
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=web /src/cmd/cc-go/web-dist ./cmd/cc-go/web-dist
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/codex-go ./cmd/cc-go/
+COPY --from=web /src/cmd/codex-go/web-dist ./cmd/codex-go/web-dist
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/codex-go ./cmd/codex-go/
 
 FROM node:24-bullseye-slim AS runtime
 WORKDIR /app

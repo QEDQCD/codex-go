@@ -63,7 +63,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -ldflags "${{ matrix.ldflags }}" -o codex-go-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/cc-go/
+          go build -ldflags "${{ matrix.ldflags }}" -o codex-go-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/codex-go/
 
       - name: Package macOS .app
         if: matrix.goos == 'darwin'
@@ -71,8 +71,8 @@ jobs:
           mkdir -p "codex-go.app/Contents/MacOS"
           mkdir -p "codex-go.app/Contents/Resources"
           cp codex-go-${{ matrix.goos }}-${{ matrix.goarch }} "codex-go.app/Contents/MacOS/codex-go"
-          cp cmd/cc-go/Info.plist "codex-go.app/Contents/"
-          cp cmd/cc-go/cc-go.icns "codex-go.app/Contents/Resources/codex-go.icns"
+          cp cmd/codex-go/Info.plist "codex-go.app/Contents/"
+          cp cmd/codex-go/codex-go.icns "codex-go.app/Contents/Resources/codex-go.icns"
           zip -r codex-go-${{ matrix.goos }}-${{ matrix.goarch }}.zip codex-go.app
 
       - name: Upload artifact

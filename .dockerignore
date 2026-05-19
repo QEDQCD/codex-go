@@ -8,4 +8,4 @@ tmp
 .DS_Store
 web/node_modules
 web/dist
-cmd/cc-go/web-dist
+cmd/codex-go/web-dist

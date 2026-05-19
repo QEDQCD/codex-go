@@ -4,7 +4,7 @@ Test: does /ilink/bot/getconfig return a fresh bot_token during normal use?
 import json, base64, random, urllib.request, os
 
 BASE = "https://ilinkai.weixin.qq.com"
-CONFIG = os.path.expanduser("~/.cc-go/config.json")
+CONFIG = os.path.expanduser("~/.codex-go/config.json")
 
 with open(CONFIG, encoding="utf-8") as f:
     cfg = json.load(f)

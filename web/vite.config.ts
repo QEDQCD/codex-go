@@ -16,7 +16,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../cmd/cc-go/web-dist',
+    outDir: '../cmd/codex-go/web-dist',
     emptyOutDir: true,
   },
 })

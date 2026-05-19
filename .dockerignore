@@ -1,0 +1,11 @@
+.git
+.github
+codex-go
+cc-go
+cc-go-*
+*.log
+tmp
+.DS_Store
+web/node_modules
+web/dist
+cmd/cc-go/web-dist

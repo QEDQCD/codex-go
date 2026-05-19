@@ -1,0 +1,23 @@
+services:
+  codex-go:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: codex-go:local
+    container_name: codex-go
+    restart: unless-stopped
+    init: true
+    working_dir: /root/liwenjian/codex-go
+    network_mode: host
+    pid: host
+    environment:
+      HOME: /root
+      CODEX_GO_RANDOM_HIGH_PORT: "1"
+      CODEX_GO_DISABLE_BROWSER: "1"
+      SSL_CERT_FILE: /etc/pki/tls/certs/ca-bundle.crt
+      SSL_CERT_DIR: /etc/pki/tls/certs
+    volumes:
+      - ${HOST_CODEX_HOME:-/root/.codex}:/root/.codex
+      - ${HOST_CODEX_GO_HOME:-/root/.codex-go}:/root/.codex-go
+      - ${HOST_WORKSPACE_ROOT:-/root/liwenjian}:/root/liwenjian
+      - /etc/pki:/etc/pki:ro

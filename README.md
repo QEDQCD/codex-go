@@ -4,8 +4,8 @@
 
 **通过微信机器人接管 Codex，实现随时随地编码**
 
-[![GitHub Release](https://img.shields.io/github/v/release/linfree/codex-go?style=flat-square&logo=github&color=blue)](https://github.com/linfree/codex-go/releases/latest)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/linfree/codex-go?style=flat-square&logo=go&color=00ADD8)](https://go.dev/)
+[![GitHub Release](https://img.shields.io/github/v/release/QEDQCD/codex-go?style=flat-square&logo=github&color=blue)](https://github.com/QEDQCD/codex-go/releases/latest)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/QEDQCD/codex-go?style=flat-square&logo=go&color=00ADD8)](https://go.dev/)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIj48cmVjdCB4PSIyIiB5PSIzIiB3aWR0aD0iMjAiIGhlaWdodD0iMTQiIHJ4PSIyIi8+PGxpbmUgeDE9IjgiIHkxPSIyMSIgeDI9IjE2IiB5Mj0iMjEiLz48bGluZSB4MT0iMTIiIHkxPSIxNyIgeDI9IjEyIiB5Mj0iMjEiLz48L3N2Zz4=)
 [![Made with React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![WeChat](https://img.shields.io/badge/WeChat-Enabled-07C160?style=flat-square&logo=wechat&logoColor=white)](https://weixin.qq.com/)
@@ -27,7 +27,7 @@ codex-go 是一款基于 [Codex](https://openai.com/) 的远程编码工具。�
 
 ## 快速开始
 
-前往 [Releases](https://github.com/linfree/codex-go/releases/latest) 下载对应平台的文件：
+前往 [Releases](https://github.com/QEDQCD/codex-go/releases/latest) 下载对应平台的文件：
 
 | 平台 | 文件 |
 |------|------|

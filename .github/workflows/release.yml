@@ -63,25 +63,25 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -ldflags "${{ matrix.ldflags }}" -o cc-go-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/cc-go/
+          go build -ldflags "${{ matrix.ldflags }}" -o codex-go-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/cc-go/
 
       - name: Package macOS .app
         if: matrix.goos == 'darwin'
         run: |
-          mkdir -p "cc-go.app/Contents/MacOS"
-          mkdir -p "cc-go.app/Contents/Resources"
-          cp cc-go-${{ matrix.goos }}-${{ matrix.goarch }} "cc-go.app/Contents/MacOS/cc-go"
-          cp cmd/cc-go/Info.plist "cc-go.app/Contents/"
-          cp cmd/cc-go/cc-go.icns "cc-go.app/Contents/Resources/"
-          zip -r cc-go-${{ matrix.goos }}-${{ matrix.goarch }}.zip cc-go.app
+          mkdir -p "codex-go.app/Contents/MacOS"
+          mkdir -p "codex-go.app/Contents/Resources"
+          cp codex-go-${{ matrix.goos }}-${{ matrix.goarch }} "codex-go.app/Contents/MacOS/codex-go"
+          cp cmd/cc-go/Info.plist "codex-go.app/Contents/"
+          cp cmd/cc-go/cc-go.icns "codex-go.app/Contents/Resources/codex-go.icns"
+          zip -r codex-go-${{ matrix.goos }}-${{ matrix.goarch }}.zip codex-go.app
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cc-go-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: codex-go-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
-            cc-go-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
-            cc-go-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+            codex-go-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+            codex-go-${{ matrix.goos }}-${{ matrix.goarch }}.zip
 
   release:
     needs: build
@@ -105,17 +105,17 @@ jobs:
 
             | 平台 | 文件 |
             |------|------|
-            | Windows | `cc-go-windows-amd64.exe` |
-            | macOS (Intel) | `cc-go-darwin-amd64.zip` |
-            | macOS (Apple Silicon) | `cc-go-darwin-arm64.zip` |
-            | Linux | `cc-go-linux-amd64` |
+            | Windows | `codex-go-windows-amd64.exe` |
+            | macOS (Intel) | `codex-go-darwin-amd64.zip` |
+            | macOS (Apple Silicon) | `codex-go-darwin-arm64.zip` |
+            | Linux | `codex-go-linux-amd64` |
 
             ## macOS 用户注意
 
             下载 `.zip` 解压后，由于应用未签名，需在终端运行：
 
             ```bash
-            xattr -cr cc-go.app
+            xattr -cr codex-go.app
             ```
 
             然后即可正常打开。

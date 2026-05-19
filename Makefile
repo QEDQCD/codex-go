@@ -1,6 +1,6 @@
 .PHONY: all build web clean run dev test build-mac-app
 
-APP_NAME = cc-go
+APP_NAME = codex-go
 WEB_DIR = web
 
 all: web build
@@ -24,9 +24,9 @@ build-mac-app:
 	GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o $(APP_NAME)-darwin-arm64 ./cmd/cc-go/
 	@mkdir -p "$(APP_NAME).app/Contents/MacOS"
 	@mkdir -p "$(APP_NAME).app/Contents/Resources"
-	@cp $(APP_NAME)-darwin-arm64 "$(APP_NAME).app/Contents/MacOS/cc-go"
+	@cp $(APP_NAME)-darwin-arm64 "$(APP_NAME).app/Contents/MacOS/codex-go"
 	@cp cmd/cc-go/Info.plist "$(APP_NAME).app/Contents/"
-	@cp cmd/cc-go/cc-go.icns "$(APP_NAME).app/Contents/Resources/"
+	@cp cmd/cc-go/cc-go.icns "$(APP_NAME).app/Contents/Resources/codex-go.icns"
 
 build-win:
 	cd $(WEB_DIR) && npm run build

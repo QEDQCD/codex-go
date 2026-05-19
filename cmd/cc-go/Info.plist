@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleExecutable</key>
-	<string>cc-go</string>
+	<string>codex-go</string>
 	<key>CFBundleIconFile</key>
-	<string>cc-go.icns</string>
+	<string>codex-go.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.linfree.cc-go</string>
+	<string>io.github.qedqcd.codex-go</string>
 	<key>CFBundleName</key>
-	<string>cc-go</string>
+	<string>codex-go</string>
 	<key>CFBundleDisplayName</key>
-	<string>cc-go</string>
+	<string>codex-go</string>
 	<key>CFBundleVersion</key>
 	<string>1.0.0</string>
 	<key>CFBundleShortVersionString</key>

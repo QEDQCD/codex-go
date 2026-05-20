@@ -283,7 +283,7 @@ func TestWechatVisibleSessionsMatchesStartedAtForNoResumeProcess(t *testing.T) {
 	}
 }
 
-func TestWechatVisibleSessionsIgnoresNoResumeProcessWithoutWorkDir(t *testing.T) {
+func TestWechatVisibleSessionsMatchesUniqueNoResumeProcessWithoutWorkDir(t *testing.T) {
 	startedAt := time.Date(2026, 4, 17, 10, 45, 0, 0, time.UTC)
 	discovered := []codex.HistorySession{
 		{
@@ -299,8 +299,39 @@ func TestWechatVisibleSessionsIgnoresNoResumeProcessWithoutWorkDir(t *testing.T)
 	}
 
 	visible := wechatVisibleSessions(nil, "", nil, discovered, runningRefs)
+	if len(visible) != 1 {
+		t.Fatalf("expected unique global match without workdir, got %+v", visible)
+	}
+	if visible[0].ID != "same-time-old-session" {
+		t.Fatalf("expected same-time-old-session, got %+v", visible[0])
+	}
+}
+
+func TestWechatVisibleSessionsIgnoresAmbiguousNoResumeProcessWithoutWorkDir(t *testing.T) {
+	startedAt := time.Date(2026, 4, 17, 10, 45, 0, 0, time.UTC)
+	discovered := []codex.HistorySession{
+		{
+			ID:          "candidate-a",
+			FirstPrompt: "候选 A",
+			ProjectPath: "/root/liwenjian/sciAudit",
+			Created:     "2026-04-17T10:45:07Z",
+			Modified:    "2026-04-17T10:47:23Z",
+		},
+		{
+			ID:          "candidate-b",
+			FirstPrompt: "候选 B",
+			ProjectPath: "/root/liwenjian/zed",
+			Created:     "2026-04-17T10:45:20Z",
+			Modified:    "2026-04-17T10:46:00Z",
+		},
+	}
+	runningRefs := []runningCodexRef{
+		{StartedAt: startedAt},
+	}
+
+	visible := wechatVisibleSessions(nil, "", nil, discovered, runningRefs)
 	if len(visible) != 0 {
-		t.Fatalf("expected no global history match without workdir, got %+v", visible)
+		t.Fatalf("expected ambiguous no-workdir process to be ignored, got %+v", visible)
 	}
 }
 

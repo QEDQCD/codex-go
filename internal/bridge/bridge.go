@@ -483,7 +483,7 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 		if ref.WorkDir != "" {
 			candidates = byProjectPath[ref.WorkDir]
 		} else {
-			return nil
+			candidates = discovered
 		}
 		if len(candidates) == 0 {
 			return nil
@@ -493,13 +493,15 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 		}
 		var best *codex.HistorySession
 		bestDelta := time.Duration(1<<63 - 1)
+		secondBestDelta := time.Duration(1<<63 - 1)
+		noWorkDir := ref.WorkDir == ""
 		for i := range candidates {
 			hs := candidates[i]
 			if seen[hs.ID] {
 				continue
 			}
 			created := sessionTime(hs)
-			if !historySessionCouldBelongToProcess(created, ref.StartedAt) {
+			if !historySessionCouldBelongToProcess(created, ref.StartedAt, noWorkDir) {
 				continue
 			}
 			if created.IsZero() {
@@ -510,8 +512,17 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 				delta = -delta
 			}
 			if delta < bestDelta {
+				secondBestDelta = bestDelta
 				best = &candidates[i]
 				bestDelta = delta
+			} else if delta < secondBestDelta {
+				secondBestDelta = delta
+			}
+		}
+		if noWorkDir && best != nil {
+			const ambiguityTolerance = 30 * time.Second
+			if secondBestDelta <= ambiguityTolerance {
+				return nil
 			}
 		}
 		return best
@@ -572,11 +583,14 @@ func historyCreatedOrModified(hs codex.HistorySession) time.Time {
 	return time.Time{}
 }
 
-func historySessionCouldBelongToProcess(created, startedAt time.Time) bool {
+func historySessionCouldBelongToProcess(created, startedAt time.Time, noWorkDir bool) bool {
 	if startedAt.IsZero() {
 		return false
 	}
-	const startTolerance = 15 * time.Minute
+	startTolerance := 15 * time.Minute
+	if noWorkDir {
+		startTolerance = 2 * time.Minute
+	}
 	if !created.IsZero() {
 		delta := created.Sub(startedAt)
 		if delta < 0 {

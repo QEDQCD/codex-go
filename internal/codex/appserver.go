@@ -2,12 +2,14 @@ package codex
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -25,6 +27,8 @@ type appServerClient struct {
 
 	events         chan Event
 	onTurnComplete func()
+	stderrMu       sync.Mutex
+	stderrBuf      bytes.Buffer
 }
 
 type appServerResponse struct {
@@ -167,7 +171,7 @@ func (c *appServerClient) writeJSON(msg map[string]interface{}) error {
 }
 
 func (c *appServerClient) readStdout() {
-	defer c.failPending("app-server stdout closed")
+	defer c.failPending(c.closedReason("app-server stdout closed"))
 	scanner := bufio.NewScanner(c.stdout)
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
 	for scanner.Scan() {
@@ -222,9 +226,27 @@ func (c *appServerClient) readStderr() {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line != "" {
+			c.stderrMu.Lock()
+			if c.stderrBuf.Len() < 8192 {
+				if c.stderrBuf.Len() > 0 {
+					c.stderrBuf.WriteByte('\n')
+				}
+				c.stderrBuf.WriteString(line)
+			}
+			c.stderrMu.Unlock()
 			fmt.Fprintf(os.Stderr, "[codex app-server] %s\n", line)
 		}
 	}
+}
+
+func (c *appServerClient) closedReason(fallback string) string {
+	c.stderrMu.Lock()
+	defer c.stderrMu.Unlock()
+	errText := strings.TrimSpace(c.stderrBuf.String())
+	if errText == "" {
+		return fallback
+	}
+	return fallback + ": " + errText
 }
 
 func (c *appServerClient) emit(evt Event) {

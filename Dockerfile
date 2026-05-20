@@ -16,6 +16,11 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/code
 FROM node:24-bullseye-slim AS runtime
 WORKDIR /app
 ENV HOME=/root
-RUN npm install -g @openai/codex@latest
+RUN npm install -g @openai/codex@latest --include=optional \
+    && codex --version \
+    && (timeout 2 codex app-server --listen stdio:// >/tmp/codex-appserver.out 2>/tmp/codex-appserver.err; \
+        code=$?; \
+        if grep -q "Missing optional dependency" /tmp/codex-appserver.err; then cat /tmp/codex-appserver.err; exit 1; fi; \
+        if [ "$code" != "0" ] && [ "$code" != "124" ]; then cat /tmp/codex-appserver.err; exit "$code"; fi)
 COPY --from=build /out/codex-go /usr/local/bin/codex-go
 ENTRYPOINT ["/usr/local/bin/codex-go"]

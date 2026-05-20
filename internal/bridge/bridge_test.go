@@ -117,8 +117,8 @@ func TestWechatVisibleSessionsIncludesLocalSessionsAndFiltersSmoke(t *testing.T)
 	}
 
 	runningRefs := []runningCodexRef{
-		{WorkDir: "/work/old"},
-		{WorkDir: "/work/app"},
+		{SessionID: "inactive-real", WorkDir: "/work/old"},
+		{SessionID: activeID, WorkDir: "/work/app"},
 	}
 	visible := wechatVisibleSessions(sessions, activeID, nil, nil, runningRefs)
 	if len(visible) != 2 {
@@ -216,6 +216,7 @@ func TestWechatVisibleSessionsIncludesUnmatchedHistoryForSameWorkDir(t *testing.
 			FirstPrompt: "新的同目录会话",
 			ProjectPath: "/root/liwenjian",
 			Model:       "gpt-5.5",
+			Created:     "2026-05-20T10:13:00Z",
 			Modified:    "2026-05-20T10:13:25Z",
 		},
 		{
@@ -228,7 +229,7 @@ func TestWechatVisibleSessionsIncludesUnmatchedHistoryForSameWorkDir(t *testing.
 	}
 	runningRefs := []runningCodexRef{
 		{SessionID: "resumed-old", WorkDir: "/root/liwenjian"},
-		{WorkDir: "/root/liwenjian"},
+		{WorkDir: "/root/liwenjian", StartedAt: time.Date(2026, 5, 20, 10, 12, 30, 0, time.UTC)},
 	}
 
 	visible := wechatVisibleSessions(sessions, "", nil, discovered, runningRefs)
@@ -240,7 +241,7 @@ func TestWechatVisibleSessionsIncludesUnmatchedHistoryForSameWorkDir(t *testing.
 	}
 }
 
-func TestWechatVisibleSessionsMatchesStartedAtWhenWorkDirUnavailable(t *testing.T) {
+func TestWechatVisibleSessionsMatchesStartedAtForNoResumeProcess(t *testing.T) {
 	startedAt := time.Date(2026, 5, 12, 2, 24, 40, 0, time.UTC)
 	sessions := []store.Session{
 		{
@@ -270,7 +271,7 @@ func TestWechatVisibleSessionsMatchesStartedAtWhenWorkDirUnavailable(t *testing.
 		},
 	}
 	runningRefs := []runningCodexRef{
-		{StartedAt: startedAt},
+		{WorkDir: "/root/liwenjian", StartedAt: startedAt},
 	}
 
 	visible := wechatVisibleSessions(sessions, "", nil, discovered, runningRefs)
@@ -279,6 +280,91 @@ func TestWechatVisibleSessionsMatchesStartedAtWhenWorkDirUnavailable(t *testing.
 	}
 	if visible[0].Seq != 694 || visible[0].ID != "fresh-no-resume" {
 		t.Fatalf("expected store-backed matched session, got %+v", visible[0])
+	}
+}
+
+func TestWechatVisibleSessionsIgnoresNoResumeProcessWithoutWorkDir(t *testing.T) {
+	startedAt := time.Date(2026, 4, 17, 10, 45, 0, 0, time.UTC)
+	discovered := []codex.HistorySession{
+		{
+			ID:          "same-time-old-session",
+			FirstPrompt: "同时间旧会话",
+			ProjectPath: "/root/liwenjian/sciAudit",
+			Created:     "2026-04-17T10:45:07Z",
+			Modified:    "2026-04-17T10:47:23Z",
+		},
+	}
+	runningRefs := []runningCodexRef{
+		{StartedAt: startedAt},
+	}
+
+	visible := wechatVisibleSessions(nil, "", nil, discovered, runningRefs)
+	if len(visible) != 0 {
+		t.Fatalf("expected no global history match without workdir, got %+v", visible)
+	}
+}
+
+func TestWechatVisibleSessionsDoesNotFallbackToOldStoppedSessionForNoResumeProcess(t *testing.T) {
+	startedAt := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
+	sessions := []store.Session{
+		{
+			ID:           "old-stopped",
+			Seq:          100,
+			Name:         "旧 sciAudit 会话",
+			WorkDir:      "/root/liwenjian/sciAudit",
+			Status:       "stopped",
+			LastActiveAt: time.Date(2026, 4, 17, 10, 47, 23, 0, time.UTC),
+		},
+	}
+	discovered := []codex.HistorySession{
+		{
+			ID:          "old-stopped",
+			FirstPrompt: "旧 sciAudit 会话",
+			ProjectPath: "/root/liwenjian/sciAudit",
+			Created:     "2026-04-17T10:31:00Z",
+			Modified:    "2026-04-17T10:47:23Z",
+		},
+	}
+	runningRefs := []runningCodexRef{
+		{WorkDir: "/root/liwenjian/sciAudit", StartedAt: startedAt},
+	}
+
+	visible := wechatVisibleSessions(sessions, "", nil, discovered, runningRefs)
+	if len(visible) != 1 {
+		t.Fatalf("expected synthetic running process session only, got %d: %+v", len(visible), visible)
+	}
+	if visible[0].ID != runningProcessSessionID("/root/liwenjian/sciAudit", startedAt) {
+		t.Fatalf("expected synthetic session for unmatched process, got %+v", visible[0])
+	}
+	if visible[0].Seq != 0 || visible[0].Name != "/root/liwenjian/sciAudit" {
+		t.Fatalf("expected unmatched process metadata, got %+v", visible[0])
+	}
+}
+
+func TestWechatVisibleSessionsDoesNotMatchOldSessionWithRecentModification(t *testing.T) {
+	startedAt := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
+	discovered := []codex.HistorySession{
+		{
+			ID:          "old-recently-modified",
+			FirstPrompt: "旧会话最近被写入",
+			ProjectPath: "/root/liwenjian/sciAudit",
+			Created:     "2026-04-17T10:31:00Z",
+			Modified:    "2026-05-20T10:01:00Z",
+		},
+	}
+	runningRefs := []runningCodexRef{
+		{WorkDir: "/root/liwenjian/sciAudit", StartedAt: startedAt},
+	}
+
+	visible := wechatVisibleSessions(nil, "", nil, discovered, runningRefs)
+	if len(visible) != 1 {
+		t.Fatalf("expected synthetic running process session only, got %d: %+v", len(visible), visible)
+	}
+	if visible[0].ID == "old-recently-modified" {
+		t.Fatalf("expected old history not to match by modified time: %+v", visible[0])
+	}
+	if !strings.HasPrefix(visible[0].ID, "running-") {
+		t.Fatalf("expected synthetic running id, got %+v", visible[0])
 	}
 }
 

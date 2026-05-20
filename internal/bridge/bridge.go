@@ -2,6 +2,8 @@ package bridge
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -458,7 +460,9 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 	}
 
 	byProjectPath := make(map[string][]codex.HistorySession)
+	byHistoryID := make(map[string]codex.HistorySession)
 	for _, hs := range discovered {
+		byHistoryID[hs.ID] = hs
 		byProjectPath[hs.ProjectPath] = append(byProjectPath[hs.ProjectPath], hs)
 	}
 	for _, hsList := range byProjectPath {
@@ -472,61 +476,45 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 	}
 
 	sessionTime := func(hs codex.HistorySession) time.Time {
-		if hs.Created != "" {
-			if t, err := time.Parse(time.RFC3339, hs.Created); err == nil {
-				return t
-			}
-		}
-		if hs.Modified != "" {
-			if t, err := time.Parse(time.RFC3339, hs.Modified); err == nil {
-				return t
-			}
-		}
-		return time.Time{}
+		return historyCreatedOrModified(hs)
 	}
-
 	findBestHistoryMatch := func(ref runningCodexRef) *codex.HistorySession {
 		var candidates []codex.HistorySession
 		if ref.WorkDir != "" {
 			candidates = byProjectPath[ref.WorkDir]
 		} else {
-			candidates = discovered
+			return nil
 		}
 		if len(candidates) == 0 {
 			return nil
 		}
+		if ref.StartedAt.IsZero() {
+			return nil
+		}
 		var best *codex.HistorySession
 		bestDelta := time.Duration(1<<63 - 1)
-		if !ref.StartedAt.IsZero() {
-			for i := range candidates {
-				hs := candidates[i]
-				if seen[hs.ID] {
-					continue
-				}
-				ts := sessionTime(hs)
-				if ts.IsZero() {
-					continue
-				}
-				delta := ts.Sub(ref.StartedAt)
-				if delta < 0 {
-					delta = -delta
-				}
-				if delta < bestDelta {
-					best = &candidates[i]
-					bestDelta = delta
-				}
-			}
-			if best != nil && bestDelta <= 15*time.Minute {
-				return best
-			}
-		}
 		for i := range candidates {
-			if seen[candidates[i].ID] {
+			hs := candidates[i]
+			if seen[hs.ID] {
 				continue
 			}
-			return &candidates[i]
+			created := sessionTime(hs)
+			if !historySessionCouldBelongToProcess(created, ref.StartedAt) {
+				continue
+			}
+			if created.IsZero() {
+				continue
+			}
+			delta := created.Sub(ref.StartedAt)
+			if delta < 0 {
+				delta = -delta
+			}
+			if delta < bestDelta {
+				best = &candidates[i]
+				bestDelta = delta
+			}
 		}
-		return nil
+		return best
 	}
 
 	for _, ref := range runningRefs {
@@ -536,6 +524,10 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 			}
 			if s, ok := pickStore(ref.SessionID, ""); ok {
 				addSession(s)
+				continue
+			}
+			if hs, ok := byHistoryID[ref.SessionID]; ok {
+				addSession(resolveHistorySession(hs))
 				continue
 			}
 			if hs := codex.FindSession(ref.SessionID); hs != nil {
@@ -549,13 +541,8 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 			continue
 		}
 
-		if ref.WorkDir != "" {
-			if s, ok := pickStore("", ref.WorkDir); ok {
-				if seen[s.ID] {
-					continue
-				}
-				addSession(s)
-			}
+		if ref.WorkDir != "" && !ref.StartedAt.IsZero() {
+			addSession(syntheticRunningProcessSession(ref))
 		}
 	}
 
@@ -569,6 +556,53 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 		})
 	}
 	return visible
+}
+
+func historyCreatedOrModified(hs codex.HistorySession) time.Time {
+	if hs.Created != "" {
+		if t, err := time.Parse(time.RFC3339, hs.Created); err == nil {
+			return t
+		}
+	}
+	if hs.Modified != "" {
+		if t, err := time.Parse(time.RFC3339, hs.Modified); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
+func historySessionCouldBelongToProcess(created, startedAt time.Time) bool {
+	if startedAt.IsZero() {
+		return false
+	}
+	const startTolerance = 15 * time.Minute
+	if !created.IsZero() {
+		delta := created.Sub(startedAt)
+		if delta < 0 {
+			delta = -delta
+		}
+		if delta <= startTolerance {
+			return true
+		}
+	}
+	return false
+}
+
+func syntheticRunningProcessSession(ref runningCodexRef) store.Session {
+	return store.Session{
+		ID:           runningProcessSessionID(ref.WorkDir, ref.StartedAt),
+		Name:         ref.WorkDir,
+		WorkDir:      ref.WorkDir,
+		Status:       "active",
+		CreatedAt:    ref.StartedAt,
+		LastActiveAt: ref.StartedAt,
+	}
+}
+
+func runningProcessSessionID(workDir string, startedAt time.Time) string {
+	sum := sha1.Sum([]byte(fmt.Sprintf("%s|%s", workDir, startedAt.UTC().Format(time.RFC3339Nano))))
+	return "running-" + hex.EncodeToString(sum[:8])
 }
 
 func isSmokeSession(s store.Session) bool {

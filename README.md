@@ -52,19 +52,21 @@ codex-go 是一款基于 [Codex](https://openai.com/) 的远程编码工具。�
 
 ## 界面截图
 
-![微信客户端](docs/screenshots/wechat_client.png)
+![微信聊天会话](docs/screenshots/微信聊天-会话.jpg)
 
-![仪表盘](docs/screenshots/dashboard.png)
+![微信聊天切换](docs/screenshots/微信聊天-切换.jpg)
 
-![会话列表](docs/screenshots/sessions.png)
+![仪表盘](docs/screenshots/仪表盘.png)
 
-![会话聊天](docs/screenshots/chat.png)
+![会话管理](docs/screenshots/会话管理.png)
 
-![微信绑定](docs/screenshots/wechat.png)
+![微信连接](docs/screenshots/微信连接.png)
 
-![系统设置](docs/screenshots/setting.png)
+![系统设置通用设置](docs/screenshots/系统设置-通用设置.png)
 
-![日志](docs/screenshots/logs.png)
+![系统设置指令](docs/screenshots/系统设置-指令.png)
+
+![系统设置导入 Skills](docs/screenshots/系统设置-导入skills.png)
 
 ## 本地开发
 

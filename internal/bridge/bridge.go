@@ -393,6 +393,7 @@ func (b *Bridge) RunningSessions() []store.Session {
 type runningCodexRef struct {
 	SessionID string
 	WorkDir   string
+	StartedAt time.Time
 }
 
 func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess *codex.Session, discovered []codex.HistorySession, runningRefs []runningCodexRef) []store.Session {
@@ -431,6 +432,19 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 		return store.Session{}, false
 	}
 
+	resolveHistorySession := func(hs codex.HistorySession) store.Session {
+		if s, ok := byID[hs.ID]; ok {
+			return s
+		}
+		return store.Session{
+			ID:      hs.ID,
+			Name:    hs.FirstPrompt,
+			WorkDir: hs.ProjectPath,
+			Model:   hs.Model,
+			Status:  "active",
+		}
+	}
+
 	addSession := func(s store.Session) {
 		if isSmokeSession(s) || (s.WorkDir == "" && s.Name == "") {
 			return
@@ -441,19 +455,6 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 		s.Status = "active"
 		seen[s.ID] = true
 		visible = append(visible, s)
-	}
-
-	for _, ref := range runningRefs {
-		if s, ok := pickStore(ref.SessionID, ref.WorkDir); ok {
-			if ref.SessionID != "" && s.ID == ref.SessionID {
-				addSession(s)
-				continue
-			}
-			if ref.WorkDir != "" && s.WorkDir == ref.WorkDir {
-				addSession(s)
-				continue
-			}
-		}
 	}
 
 	byProjectPath := make(map[string][]codex.HistorySession)
@@ -470,51 +471,90 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 		}
 	}
 
+	sessionTime := func(hs codex.HistorySession) time.Time {
+		if hs.Created != "" {
+			if t, err := time.Parse(time.RFC3339, hs.Created); err == nil {
+				return t
+			}
+		}
+		if hs.Modified != "" {
+			if t, err := time.Parse(time.RFC3339, hs.Modified); err == nil {
+				return t
+			}
+		}
+		return time.Time{}
+	}
+
+	findBestHistoryMatch := func(ref runningCodexRef) *codex.HistorySession {
+		var candidates []codex.HistorySession
+		if ref.WorkDir != "" {
+			candidates = byProjectPath[ref.WorkDir]
+		} else {
+			candidates = discovered
+		}
+		if len(candidates) == 0 {
+			return nil
+		}
+		var best *codex.HistorySession
+		bestDelta := time.Duration(1<<63 - 1)
+		if !ref.StartedAt.IsZero() {
+			for i := range candidates {
+				hs := candidates[i]
+				if seen[hs.ID] {
+					continue
+				}
+				ts := sessionTime(hs)
+				if ts.IsZero() {
+					continue
+				}
+				delta := ts.Sub(ref.StartedAt)
+				if delta < 0 {
+					delta = -delta
+				}
+				if delta < bestDelta {
+					best = &candidates[i]
+					bestDelta = delta
+				}
+			}
+			if best != nil && bestDelta <= 15*time.Minute {
+				return best
+			}
+		}
+		for i := range candidates {
+			if seen[candidates[i].ID] {
+				continue
+			}
+			return &candidates[i]
+		}
+		return nil
+	}
+
 	for _, ref := range runningRefs {
 		if ref.SessionID != "" {
 			if seen[ref.SessionID] {
 				continue
 			}
-			if s, ok := byID[ref.SessionID]; ok {
+			if s, ok := pickStore(ref.SessionID, ""); ok {
 				addSession(s)
 				continue
 			}
 			if hs := codex.FindSession(ref.SessionID); hs != nil {
-				addSession(store.Session{
-					ID:      hs.ID,
-					Name:    hs.FirstPrompt,
-					WorkDir: hs.ProjectPath,
-					Model:   hs.Model,
-					Status:  "active",
-				})
+				addSession(resolveHistorySession(*hs))
 			}
 			continue
 		}
-		if ref.WorkDir == "" {
+
+		if hs := findBestHistoryMatch(ref); hs != nil {
+			addSession(resolveHistorySession(*hs))
 			continue
 		}
-		if seen[ref.WorkDir] {
-			continue
-		}
-		candidates := byProjectPath[ref.WorkDir]
-		if len(candidates) > 0 {
-			hs := candidates[0]
+
+		if ref.WorkDir != "" {
 			if s, ok := pickStore("", ref.WorkDir); ok {
-				addSession(store.Session{
-					ID:      s.ID,
-					Name:    s.Name,
-					WorkDir: s.WorkDir,
-					Model:   s.Model,
-					Status:  "active",
-				})
-			} else {
-				addSession(store.Session{
-					ID:      hs.ID,
-					Name:    hs.FirstPrompt,
-					WorkDir: hs.ProjectPath,
-					Model:   hs.Model,
-					Status:  "active",
-				})
+				if seen[s.ID] {
+					continue
+				}
+				addSession(s)
 			}
 		}
 	}
@@ -566,6 +606,7 @@ func runningCodexRefs() []runningCodexRef {
 	if err != nil {
 		return nil
 	}
+	bootTime, _ := procBootTime()
 	seen := map[string]bool{}
 	var refs []runningCodexRef
 	for _, entry := range entries {
@@ -583,17 +624,63 @@ func runningCodexRefs() []runningCodexRef {
 		}
 		sessionID := extractResumeSessionID(args)
 		workDir, _ := os.Readlink(filepath.Join(pidDir, "cwd"))
+		startedAt, _ := procStartTime(pidDir, bootTime)
 		key := sessionID
 		if key == "" {
 			key = workDir
+		}
+		if key == "" {
+			key = entry.Name()
 		}
 		if key == "" || seen[key] {
 			continue
 		}
 		seen[key] = true
-		refs = append(refs, runningCodexRef{SessionID: sessionID, WorkDir: workDir})
+		refs = append(refs, runningCodexRef{SessionID: sessionID, WorkDir: workDir, StartedAt: startedAt})
 	}
 	return refs
+}
+
+func procBootTime() (time.Time, error) {
+	data, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return time.Time{}, err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "btime ") {
+			sec, err := strconv.ParseInt(strings.TrimSpace(strings.TrimPrefix(line, "btime ")), 10, 64)
+			if err != nil {
+				return time.Time{}, err
+			}
+			return time.Unix(sec, 0), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("btime not found")
+}
+
+func procStartTime(pidDir string, bootTime time.Time) (time.Time, error) {
+	if bootTime.IsZero() {
+		return time.Time{}, fmt.Errorf("boot time unavailable")
+	}
+	data, err := os.ReadFile(filepath.Join(pidDir, "stat"))
+	if err != nil {
+		return time.Time{}, err
+	}
+	raw := string(data)
+	idx := strings.LastIndex(raw, ") ")
+	if idx < 0 {
+		return time.Time{}, fmt.Errorf("invalid proc stat")
+	}
+	fields := strings.Fields(raw[idx+2:])
+	if len(fields) < 20 {
+		return time.Time{}, fmt.Errorf("short proc stat")
+	}
+	startTicks, err := strconv.ParseInt(fields[19], 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	const procClockTicks = 100
+	return bootTime.Add(time.Duration(startTicks*int64(time.Second)) / procClockTicks), nil
 }
 
 func isCodexProcess(args []string) bool {

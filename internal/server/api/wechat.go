@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -29,9 +31,9 @@ func registerWechatRoutes(r *gin.RouterGroup, cfg *config.Config, wc *wechat.Cli
 			return
 		}
 		go func() {
-			ctx := c.Request.Context()
-			deadline := time.Now().Add(10 * time.Minute)
-			for time.Now().Before(deadline) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			for {
 				select {
 				case <-ctx.Done():
 					return
@@ -47,11 +49,17 @@ func registerWechatRoutes(r *gin.RouterGroup, cfg *config.Config, wc *wechat.Cli
 					cfg.Wechat.BotToken = token
 					cfg.Wechat.BaseURL = baseURL
 					cfg.Wechat.LoginTime = time.Now().Format(time.RFC3339)
-					cfg.Save()
+					if err := cfg.Save(); err != nil {
+						log.Printf("[wechat] failed to save login config: %v", err)
+					}
 					wc.Start()
 					return
 				}
-				time.Sleep(1 * time.Second)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(1 * time.Second):
+				}
 			}
 		}()
 		c.JSON(http.StatusOK, gin.H{"qrcode": qrcode, "qrcode_img": qrcodeImg})

@@ -200,6 +200,88 @@ func TestWechatVisibleSessionsIncludesOnlyRunningRefs(t *testing.T) {
 	}
 }
 
+func TestWechatVisibleSessionsIncludesUnmatchedHistoryForSameWorkDir(t *testing.T) {
+	sessions := []store.Session{
+		{
+			ID:      "resumed-old",
+			Seq:     409,
+			Name:    "恢复的旧会话",
+			WorkDir: "/root/liwenjian",
+			Status:  "active",
+		},
+	}
+	discovered := []codex.HistorySession{
+		{
+			ID:          "fresh-no-resume",
+			FirstPrompt: "新的同目录会话",
+			ProjectPath: "/root/liwenjian",
+			Model:       "gpt-5.5",
+			Modified:    "2026-05-20T10:13:25Z",
+		},
+		{
+			ID:          "resumed-old",
+			FirstPrompt: "恢复的旧会话",
+			ProjectPath: "/root/liwenjian",
+			Model:       "gpt-5.5",
+			Modified:    "2026-05-18T10:05:46Z",
+		},
+	}
+	runningRefs := []runningCodexRef{
+		{SessionID: "resumed-old", WorkDir: "/root/liwenjian"},
+		{WorkDir: "/root/liwenjian"},
+	}
+
+	visible := wechatVisibleSessions(sessions, "", nil, discovered, runningRefs)
+	if len(visible) != 2 {
+		t.Fatalf("expected resumed and fresh sessions, got %d: %+v", len(visible), visible)
+	}
+	if visible[0].ID != "resumed-old" || visible[1].ID != "fresh-no-resume" {
+		t.Fatalf("expected unmatched same-workdir history session to be included, got %+v", visible)
+	}
+}
+
+func TestWechatVisibleSessionsMatchesStartedAtWhenWorkDirUnavailable(t *testing.T) {
+	startedAt := time.Date(2026, 5, 12, 2, 24, 40, 0, time.UTC)
+	sessions := []store.Session{
+		{
+			ID:      "fresh-no-resume",
+			Seq:     694,
+			Name:    "新的同目录会话",
+			WorkDir: "/root/liwenjian",
+			Status:  "stopped",
+		},
+	}
+	discovered := []codex.HistorySession{
+		{
+			ID:          "fresh-no-resume",
+			FirstPrompt: "新的同目录会话",
+			ProjectPath: "/root/liwenjian",
+			Model:       "gpt-5.5",
+			Created:     "2026-05-12T02:24:38Z",
+			Modified:    "2026-05-20T10:13:25Z",
+		},
+		{
+			ID:          "other-session",
+			FirstPrompt: "其他目录会话",
+			ProjectPath: "/root/liwenjian/other",
+			Model:       "gpt-5.5",
+			Created:     "2026-05-12T02:40:00Z",
+			Modified:    "2026-05-12T03:00:00Z",
+		},
+	}
+	runningRefs := []runningCodexRef{
+		{StartedAt: startedAt},
+	}
+
+	visible := wechatVisibleSessions(sessions, "", nil, discovered, runningRefs)
+	if len(visible) != 1 {
+		t.Fatalf("expected 1 startedAt-matched session, got %d: %+v", len(visible), visible)
+	}
+	if visible[0].Seq != 694 || visible[0].ID != "fresh-no-resume" {
+		t.Fatalf("expected store-backed matched session, got %+v", visible[0])
+	}
+}
+
 func TestSendWechatBudgetedSingleSplitsLongText(t *testing.T) {
 	var sent []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

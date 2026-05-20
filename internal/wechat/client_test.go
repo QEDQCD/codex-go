@@ -1,6 +1,10 @@
 package wechat
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -82,5 +86,43 @@ func TestParseLoginTime(t *testing.T) {
 	lt2 := ParseLoginTime("")
 	if !lt2.IsZero() {
 		t.Error("expected zero time for empty string")
+	}
+}
+
+func TestPollLoopKeepsConnectedAfterTransientPollError(t *testing.T) {
+	var calls atomic.Int32
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/ilink/bot/getupdates" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if calls.Add(1) == 1 {
+			_, _ = w.Write([]byte(`not-json`))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"get_updates_buf": "",
+			"msgs":            []interface{}{},
+		})
+	}))
+	defer api.Close()
+
+	c := NewClient(api.URL, "test-token", time.Now(), "")
+	c.Start()
+	defer c.Stop()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if calls.Load() >= 2 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if calls.Load() < 2 {
+		t.Fatalf("expected poll loop to retry after a transient error, calls=%d status=%s", calls.Load(), c.Status())
+	}
+	if c.Status() != StatusConnected {
+		t.Fatalf("expected client to remain connected after transient poll error, got %s", c.Status())
 	}
 }

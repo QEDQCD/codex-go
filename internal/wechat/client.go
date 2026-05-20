@@ -64,6 +64,8 @@ func NewClient(baseURL, botToken string, loginTime time.Time, cdnBaseURL string)
 	if cdnBaseURL == "" {
 		cdnBaseURL = DefaultCDNBaseURL
 	}
+	done := make(chan struct{})
+	close(done)
 	return &Client{
 		baseURL:       baseURL,
 		botToken:      botToken,
@@ -75,7 +77,7 @@ func NewClient(baseURL, botToken string, loginTime time.Time, cdnBaseURL string)
 		msgCh:         make(chan Message, 100),
 		typingTickets: make(map[string]string),
 		stopCh:        make(chan struct{}),
-		done:          make(chan struct{}),
+		done:          done,
 	}
 }
 
@@ -471,7 +473,6 @@ func (c *Client) pollLoop() {
 		msgs, newBuf, err := c.PollMessages(35000)
 		if err != nil {
 			log.Printf("[wechat] poll error: %v", err)
-			c.SetStatus(StatusDisconnected)
 			time.Sleep(2 * time.Second)
 			continue
 		}

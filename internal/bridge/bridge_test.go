@@ -282,6 +282,54 @@ func TestWechatVisibleSessionsMatchesStartedAtWhenWorkDirUnavailable(t *testing.
 	}
 }
 
+func TestFinalizeEndedSessionIgnoresStaleSession(t *testing.T) {
+	cfg := config.DefaultConfig()
+	st, err := store.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	b := New(cfg, st)
+	current := &codex.Session{ID: "new", Status: codex.StatusActive}
+	stale := &codex.Session{ID: "old", Status: codex.StatusStopped}
+	b.activeSess = current
+	b.activeSessID = current.ID
+
+	sid, status, handled := b.finalizeEndedSession(stale)
+	if handled {
+		t.Fatalf("expected stale session to be ignored, got sid=%q status=%q", sid, status)
+	}
+	if b.activeSess != current || b.activeSessID != current.ID {
+		t.Fatalf("expected current session to stay active, got active=%+v id=%q", b.activeSess, b.activeSessID)
+	}
+}
+
+func TestFinalizeEndedSessionClearsCurrentSession(t *testing.T) {
+	cfg := config.DefaultConfig()
+	st, err := store.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	b := New(cfg, st)
+	current := &codex.Session{ID: "current", Status: codex.StatusError}
+	b.activeSess = current
+	b.activeSessID = current.ID
+
+	sid, status, handled := b.finalizeEndedSession(current)
+	if !handled {
+		t.Fatal("expected current session to be finalized")
+	}
+	if sid != current.ID || status != codex.StatusError {
+		t.Fatalf("unexpected finalize result sid=%q status=%q", sid, status)
+	}
+	if b.activeSess != nil || b.activeSessID != "" {
+		t.Fatalf("expected bridge active session to be cleared, got active=%+v id=%q", b.activeSess, b.activeSessID)
+	}
+}
+
 func TestSendWechatBudgetedSingleSplitsLongText(t *testing.T) {
 	var sent []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

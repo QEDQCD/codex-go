@@ -982,6 +982,9 @@ func (b *Bridge) readCodexEvents(sess *codex.Session, logger *codex.SessionLogge
 		}
 	}()
 	for evt := range sess.Events() {
+		if !b.isCurrentSession(sess) {
+			continue
+		}
 		switch evt.Type {
 		case codex.EventSystem:
 			if evt.SessionID != "" && b.activeSessID == "" {
@@ -1106,16 +1109,47 @@ func (b *Bridge) readCodexEvents(sess *codex.Session, logger *codex.SessionLogge
 			})
 		}
 	}
-	// Session event stream ended — Codex process exited
-	sid := b.activeSessID
-	status := sess.Status
-	b.StopSession()
+	// Session event stream ended — only clear bridge state if this is still the current session.
+	sid, status, handled := b.finalizeEndedSession(sess)
+	if !handled {
+		return
+	}
 	if status == codex.StatusError {
 		b.sendWechatBudgetedSingle("Codex 会话异常退出")
 	} else {
 		b.sendWechatBudgetedSingle("Codex 会话已结束")
 	}
 	b.emit(WSEvent{Event: "session_status_changed", SessionID: sid, Status: "stopped"})
+}
+
+func (b *Bridge) isCurrentSession(sess *codex.Session) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.activeSess == sess
+}
+
+func (b *Bridge) finalizeEndedSession(sess *codex.Session) (string, codex.SessionStatus, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.activeSess != sess {
+		return "", "", false
+	}
+
+	sid := b.activeSessID
+	status := sess.Status
+	b.pendingPerms = nil
+	b.newSession = nil
+	b.msgBuffer = nil
+	b.bufferMode = false
+	b.pendingText.Reset()
+	if b.activeLogger != nil {
+		b.activeLogger.Close()
+		b.activeLogger = nil
+	}
+	b.store.UpdateSessionStatus(sid, "stopped", 0)
+	b.activeSess = nil
+	b.activeSessID = ""
+	return sid, status, true
 }
 
 func (b *Bridge) formatPermissionWeChat(count int, toolName string, input map[string]interface{}) string {

@@ -1,6 +1,10 @@
 package codex
 
-import "testing"
+import (
+	"errors"
+	"testing"
+	"time"
+)
 
 func TestAppServerNotificationThreadStarted(t *testing.T) {
 	events := appServerNotificationToEvents("thread/started", map[string]interface{}{
@@ -121,4 +125,52 @@ func TestAppServerEmitAfterEventChannelClosedDoesNotPanic(t *testing.T) {
 		}
 	}()
 	client.emit(Event{Type: EventError, Error: "late event"})
+}
+
+type stubReadCloser struct {
+	err error
+}
+
+func (s *stubReadCloser) Read(_ []byte) (int, error) {
+	return 0, s.err
+}
+
+func (s *stubReadCloser) Close() error {
+	return nil
+}
+
+func TestAppServerReadStdoutReportsReadErrorWhenStillActive(t *testing.T) {
+	events := make(chan Event, 1)
+	client := &appServerClient{
+		stdout: &stubReadCloser{err: errors.New("file already closed")},
+		events: events,
+	}
+
+	go client.readStdout()
+
+	select {
+	case evt := <-events:
+		if evt.Type != EventError {
+			t.Fatalf("expected error event, got %+v", evt)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected error event")
+	}
+}
+
+func TestAppServerReadStdoutIgnoresReadErrorAfterIntentionalClose(t *testing.T) {
+	events := make(chan Event, 1)
+	client := &appServerClient{
+		stdout: &stubReadCloser{err: errors.New("file already closed")},
+		events: events,
+		closed: true,
+	}
+
+	go client.readStdout()
+
+	select {
+	case evt := <-events:
+		t.Fatalf("expected no event, got %+v", evt)
+	case <-time.After(200 * time.Millisecond):
+	}
 }

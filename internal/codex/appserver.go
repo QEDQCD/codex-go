@@ -206,7 +206,7 @@ func (c *appServerClient) readStdout() {
 			c.emit(evt)
 		}
 	}
-	if err := scanner.Err(); err != nil {
+	if err := scanner.Err(); err != nil && !c.isClosed() {
 		c.emit(Event{Type: EventError, Error: fmt.Sprintf("read app-server: %v", err)})
 	}
 }
@@ -258,6 +258,12 @@ func (c *appServerClient) emit(evt Event) {
 	case c.events <- evt:
 	default:
 	}
+}
+
+func (c *appServerClient) isClosed() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
 }
 
 func (c *appServerClient) close() {

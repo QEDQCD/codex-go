@@ -60,6 +60,8 @@ codex-go 是一款基于 [Codex](https://openai.com/) 的远程编码工具。�
 
 ![会话管理](docs/screenshots/会话管理.png)
 
+![会话内容](docs/screenshots/会话内容.png)
+
 ![微信连接](docs/screenshots/微信连接.png)
 
 ![系统设置通用设置](docs/screenshots/系统设置-通用设置.png)

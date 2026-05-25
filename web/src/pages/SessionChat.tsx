@@ -20,6 +20,7 @@ interface Session {
   name: string
   work_dir: string
   status: string
+  attached?: boolean
   message_count: number
   created: string
   modified: string
@@ -85,6 +86,7 @@ export default function SessionChat() {
   const [loading, setLoading] = useState(true)
   const [inputValue, setInputValue] = useState('')
   const [sending, setSending] = useState(false)
+  const [resuming, setResuming] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const nearBottomRef = useRef(true)
@@ -289,6 +291,26 @@ export default function SessionChat() {
       console.error('Failed to send message:', err)
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleTakeOver = async () => {
+    if (!id || resuming) return
+    setResuming(true)
+    try {
+      await api.resumeSession(id)
+      for (let i = 0; i < 20; i++) {
+        await new Promise(resolve => setTimeout(resolve, 250))
+        const next = await api.getSession(id).catch(() => null) as Session | null
+        if (next) {
+          setSession(next)
+          if (next.attached) {
+            return
+          }
+        }
+      }
+    } finally {
+      setResuming(false)
     }
   }
 
@@ -631,7 +653,7 @@ export default function SessionChat() {
       </div>
 
       {/* Chat input */}
-      {session?.status === 'active' ? (
+      {session?.status === 'active' && session?.attached ? (
         <div className="bg-surface-container/90 backdrop-blur-md border-t border-outline-variant px-6 py-4 flex-shrink-0">
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl flex items-end gap-3 px-4 py-3">
             <textarea
@@ -651,6 +673,22 @@ export default function SessionChat() {
               <span className="material-symbols-outlined text-[18px]">
                 {sending ? 'progress_activity' : 'send'}
               </span>
+            </button>
+          </div>
+        </div>
+      ) : session?.status === 'active' ? (
+        <div className="bg-surface-container/90 backdrop-blur-md border-t border-outline-variant px-6 py-4 flex-shrink-0">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl flex items-center justify-between gap-4 px-4 py-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-secondary text-[18px]">link</span>
+              <span className="text-on-surface-variant text-[13px]">会话正在运行，接管后可发送消息</span>
+            </div>
+            <button
+              onClick={handleTakeOver}
+              disabled={resuming}
+              className="px-4 py-2 rounded-lg bg-secondary/20 text-secondary text-[13px] hover:bg-secondary/30 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            >
+              {resuming ? '接管中...' : '接管会话'}
             </button>
           </div>
         </div>

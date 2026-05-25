@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -305,6 +306,20 @@ func ReadHistory(filePath string) ([]HistoryMessage, error) {
 	return messages, scanner.Err()
 }
 
+func ReadSessionMessages(sessionID, filePath string) ([]HistoryMessage, error) {
+	messages, err := ReadHistory(filePath)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := ReadLog(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	messages = append(messages, historyMessagesFromLog(entries)...)
+	sortHistoryMessages(messages)
+	return messages, nil
+}
+
 func shouldSkipAdjacentDuplicate(existing []HistoryMessage, next HistoryMessage) bool {
 	if len(existing) == 0 {
 		return false
@@ -342,6 +357,40 @@ func timestampsClose(a, b string) bool {
 		delta = -delta
 	}
 	return delta <= 2*time.Second
+}
+
+func historyMessagesFromLog(entries []LogEntry) []HistoryMessage {
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make([]HistoryMessage, 0, len(entries))
+	for _, entry := range entries {
+		if entry.Type != "error" || entry.Error == "" {
+			continue
+		}
+		out = append(out, HistoryMessage{
+			Type:      "system",
+			Role:      "system",
+			Subtype:   "error",
+			Content:   entry.Error,
+			Timestamp: entry.Timestamp,
+		})
+	}
+	return out
+}
+
+func sortHistoryMessages(messages []HistoryMessage) {
+	sort.SliceStable(messages, func(i, j int) bool {
+		if messages[i].Timestamp == "" || messages[j].Timestamp == "" {
+			return false
+		}
+		ti, errI := time.Parse(time.RFC3339Nano, messages[i].Timestamp)
+		tj, errJ := time.Parse(time.RFC3339Nano, messages[j].Timestamp)
+		if errI != nil || errJ != nil {
+			return false
+		}
+		return ti.Before(tj)
+	})
 }
 
 func extractCodexContent(val interface{}) string {

@@ -1,7 +1,9 @@
 package codex
 
 import (
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -110,6 +112,57 @@ func TestReadHistory_DeduplicatesAdjacentEventAndResponseMessages(t *testing.T) 
 	}
 	if msgs[2].Role != "tool_result" || msgs[2].ToolResult != "tool output" {
 		t.Fatalf("unexpected third message: %#v", msgs[2])
+	}
+}
+
+func TestReadSessionMessages_MergesBridgeErrorsFromLog(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	historyFile := filepath.Join(tmpHome, "session.jsonl")
+	historyContent := strings.Join([]string{
+		`{"timestamp":"2026-05-25T02:15:45.420Z","type":"event_msg","payload":{"type":"user_message","message":"当前的tag有哪些"}}`,
+		`{"timestamp":"2026-05-25T02:16:41.346Z","type":"event_msg","payload":{"type":"agent_message","message":"处理中"}}`,
+	}, "\n")
+	if err := os.WriteFile(historyFile, []byte(historyContent+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	logDir := filepath.Join(tmpHome, ".codex-go", "logs")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	logFile := filepath.Join(logDir, "session-123.jsonl")
+	entry := LogEntry{
+		Type:      "error",
+		Timestamp: "2026-05-25T02:16:42.000Z",
+		Error:     "unexpected status 503 Service Unavailable: No available providers",
+	}
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(logFile, append(raw, '\n'), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	msgs, err := ReadSessionMessages("session-123", historyFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := len(msgs), 3; got != want {
+		t.Fatalf("expected %d messages, got %d: %#v", want, got, msgs)
+	}
+	last := msgs[len(msgs)-1]
+	if last.Role != "system" || last.Subtype != "error" {
+		t.Fatalf("expected final message to be system error, got %#v", last)
+	}
+	if !strings.Contains(last.Content, "503 Service Unavailable") {
+		t.Fatalf("expected merged error content, got %#v", last)
+	}
+	if last.Timestamp != "2026-05-25T02:16:42.000Z" {
+		t.Fatalf("expected merged error timestamp, got %#v", last)
 	}
 }
 

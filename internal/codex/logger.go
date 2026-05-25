@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 type LogEntry struct {
 	Type    string `json:"type"`
+	Timestamp string `json:"timestamp,omitempty"`
 	Role    string `json:"role,omitempty"`
 	Content string `json:"content"`
 	Tool    string `json:"tool,omitempty"`
@@ -60,6 +62,9 @@ func (sl *SessionLogger) writeLoop() {
 }
 
 func (sl *SessionLogger) Log(entry LogEntry) {
+	if entry.Timestamp == "" {
+		entry.Timestamp = time.Now().UTC().Format(time.RFC3339Nano)
+	}
 	sl.mu.Lock()
 	closed := sl.closed
 	sl.mu.Unlock()

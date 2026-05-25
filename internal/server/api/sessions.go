@@ -48,6 +48,23 @@ func registerCodexRoutes(r *gin.RouterGroup, st *store.Store, br *bridge.Bridge)
 
 var startTime = time.Now()
 
+type sessionRuntimeState struct {
+	Status   string
+	Attached bool
+}
+
+func resolveSessionRuntimeState(id, activeID string, running []store.Session) sessionRuntimeState {
+	if id == activeID && activeID != "" {
+		return sessionRuntimeState{Status: "active", Attached: true}
+	}
+	for _, s := range running {
+		if s.ID == id {
+			return sessionRuntimeState{Status: "active", Attached: false}
+		}
+	}
+	return sessionRuntimeState{Status: "stopped", Attached: false}
+}
+
 func registerSessionRoutes(r *gin.RouterGroup, st *store.Store, br *bridge.Bridge) {
 	r.POST("/sync", func(c *gin.Context) {
 		br.SyncSessions()
@@ -173,17 +190,15 @@ func registerSessionRoutes(r *gin.RouterGroup, st *store.Store, br *bridge.Bridg
 
 	r.GET("/sessions/:id", func(c *gin.Context) {
 		id := c.Param("id")
-		status := "stopped"
-		if br.ActiveSessionID() == id {
-			status = "active"
-		}
+		runtimeState := resolveSessionRuntimeState(id, br.ActiveSessionID(), br.RunningSessions())
 		// Try store first (covers new sessions not yet on disk)
 		if storeSess, _ := st.GetSession(id); storeSess != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"id":            storeSess.ID,
 				"name":          storeSess.Name,
 				"work_dir":      storeSess.WorkDir,
-				"status":        status,
+				"status":        runtimeState.Status,
+				"attached":      runtimeState.Attached,
 				"created":       storeSess.CreatedAt.Format(time.RFC3339),
 				"modified":      storeSess.LastActiveAt.Format(time.RFC3339),
 				"git_branch":    storeSess.GitBranch,
@@ -202,7 +217,8 @@ func registerSessionRoutes(r *gin.RouterGroup, st *store.Store, br *bridge.Bridg
 			"id":         hs.ID,
 			"name":       hs.FirstPrompt,
 			"work_dir":   hs.ProjectPath,
-			"status":     status,
+			"status":     runtimeState.Status,
+			"attached":   runtimeState.Attached,
 			"created":    hs.Created,
 			"modified":   hs.Modified,
 			"git_branch": hs.GitBranch,
@@ -216,7 +232,7 @@ func registerSessionRoutes(r *gin.RouterGroup, st *store.Store, br *bridge.Bridg
 			c.JSON(http.StatusNotFound, gin.H{"error": "history file not found"})
 			return
 		}
-		msgs, err := codex.ReadHistory(hs.FilePath)
+		msgs, err := codex.ReadSessionMessages(id, hs.FilePath)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

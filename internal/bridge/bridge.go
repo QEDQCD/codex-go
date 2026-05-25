@@ -552,6 +552,13 @@ func wechatVisibleSessions(sessions []store.Session, activeID string, activeSess
 			continue
 		}
 
+		if ref.WorkDir != "" {
+			if s, ok := pickStore("", ref.WorkDir); ok && strings.EqualFold(s.Status, "active") {
+				addSession(s)
+				continue
+			}
+		}
+
 		if ref.WorkDir != "" && !ref.StartedAt.IsZero() {
 			addSession(syntheticRunningProcessSession(ref))
 		}

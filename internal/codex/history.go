@@ -296,10 +296,52 @@ func ReadHistory(filePath string) ([]HistoryMessage, error) {
 		}
 		msg := convertHistoryLine(raw)
 		if msg != nil {
+			if shouldSkipAdjacentDuplicate(messages, *msg) {
+				continue
+			}
 			messages = append(messages, *msg)
 		}
 	}
 	return messages, scanner.Err()
+}
+
+func shouldSkipAdjacentDuplicate(existing []HistoryMessage, next HistoryMessage) bool {
+	if len(existing) == 0 {
+		return false
+	}
+	prev := existing[len(existing)-1]
+	if prev.Role != next.Role || prev.Type == next.Type {
+		return false
+	}
+	if prev.Role != "user" && prev.Role != "assistant" {
+		return false
+	}
+	if prev.Content == "" || prev.Content != next.Content {
+		return false
+	}
+	if prev.Thinking != next.Thinking {
+		return false
+	}
+	if !timestampsClose(prev.Timestamp, next.Timestamp) {
+		return false
+	}
+	return true
+}
+
+func timestampsClose(a, b string) bool {
+	if a == "" || b == "" {
+		return a == b
+	}
+	at, errA := time.Parse(time.RFC3339Nano, a)
+	bt, errB := time.Parse(time.RFC3339Nano, b)
+	if errA != nil || errB != nil {
+		return a == b
+	}
+	delta := at.Sub(bt)
+	if delta < 0 {
+		delta = -delta
+	}
+	return delta <= 2*time.Second
 }
 
 func extractCodexContent(val interface{}) string {

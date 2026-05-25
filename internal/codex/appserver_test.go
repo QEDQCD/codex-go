@@ -1,10 +1,22 @@
 package codex
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"io"
+	"strings"
 	"testing"
 	"time"
 )
+
+type captureWriteCloser struct {
+	bytes.Buffer
+}
+
+func (c *captureWriteCloser) Close() error {
+	return nil
+}
 
 func TestAppServerNotificationThreadStarted(t *testing.T) {
 	events := appServerNotificationToEvents("thread/started", map[string]interface{}{
@@ -82,6 +94,36 @@ func TestAppServerRequestCommandApproval(t *testing.T) {
 	}
 }
 
+func TestAppServerRequestPermissionsApproval(t *testing.T) {
+	evt, ok := appServerRequestToEvent("8", "item/permissions/requestApproval", map[string]interface{}{
+		"threadId": "thread-123",
+		"reason":   "need host read access",
+		"permissions": map[string]interface{}{
+			"fileSystem": map[string]interface{}{
+				"entries": []interface{}{
+					map[string]interface{}{
+						"access": "read",
+						"path": map[string]interface{}{
+							"type": "path",
+							"path": "/root/liwenjian/codex-go",
+						},
+					},
+				},
+			},
+		},
+	}, "")
+
+	if !ok {
+		t.Fatal("expected request event")
+	}
+	if evt.Type != EventControlRequest || evt.RequestID != "8" || evt.ToolName != "permissions_request" {
+		t.Fatalf("unexpected event: %+v", evt)
+	}
+	if evt.ToolInput["reason"] != "need host read access" {
+		t.Fatalf("unexpected input: %+v", evt.ToolInput)
+	}
+}
+
 func TestBuildAppServerPermissionResponse(t *testing.T) {
 	accepted := buildAppServerPermissionResponse("item/commandExecution/requestApproval", true, "", nil)
 	if accepted["decision"] != "accept" {
@@ -91,6 +133,48 @@ func TestBuildAppServerPermissionResponse(t *testing.T) {
 	declined := buildAppServerPermissionResponse("item/fileChange/requestApproval", false, "", nil)
 	if declined["decision"] != "decline" {
 		t.Fatalf("expected decline decision, got %+v", declined)
+	}
+}
+
+func TestBuildAppServerPermissionsApprovalResponse(t *testing.T) {
+	accepted := buildAppServerPermissionResponse("item/permissions/requestApproval", true, "", map[string]interface{}{
+		"permissions": map[string]interface{}{
+			"network": map[string]interface{}{"enabled": true},
+			"fileSystem": map[string]interface{}{
+				"entries": []interface{}{
+					map[string]interface{}{
+						"access": "read",
+						"path": map[string]interface{}{
+							"type": "path",
+							"path": "/tmp/work",
+						},
+					},
+				},
+			},
+		},
+	})
+	perms, ok := accepted["permissions"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("missing granted permissions: %+v", accepted)
+	}
+	if perms["network"] == nil || perms["fileSystem"] == nil {
+		t.Fatalf("expected requested permissions to be granted, got %+v", perms)
+	}
+	if accepted["scope"] != "turn" {
+		t.Fatalf("expected turn scope, got %+v", accepted)
+	}
+
+	declined := buildAppServerPermissionResponse("item/permissions/requestApproval", false, "", map[string]interface{}{
+		"permissions": map[string]interface{}{
+			"network": map[string]interface{}{"enabled": true},
+		},
+	})
+	declinedPerms, ok := declined["permissions"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("missing denied permissions payload: %+v", declined)
+	}
+	if len(declinedPerms) != 0 {
+		t.Fatalf("expected denied response to grant nothing, got %+v", declinedPerms)
 	}
 }
 
@@ -172,5 +256,44 @@ func TestAppServerReadStdoutIgnoresReadErrorAfterIntentionalClose(t *testing.T) 
 	case evt := <-events:
 		t.Fatalf("expected no event, got %+v", evt)
 	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestAppServerRespondPreservesNumericRequestID(t *testing.T) {
+	stdin := &captureWriteCloser{}
+	events := make(chan Event, 1)
+	client := &appServerClient{
+		stdin:   stdin,
+		stdout:  io.NopCloser(strings.NewReader("{\"id\":7,\"method\":\"item/commandExecution/requestApproval\",\"params\":{\"threadId\":\"thread-123\",\"command\":\"git tag\"}}\n")),
+		events:  events,
+		pending: make(map[string]chan appServerResponse),
+		request: make(map[string]appServerRequestState),
+	}
+
+	go client.readStdout()
+
+	select {
+	case evt := <-events:
+		if evt.RequestID != "7" {
+			t.Fatalf("expected request id 7, got %+v", evt)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected request event")
+	}
+
+	if err := client.respond("7", map[string]interface{}{"decision": "accept"}); err != nil {
+		t.Fatalf("respond failed: %v", err)
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(stdin.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	id, ok := payload["id"].(float64)
+	if !ok {
+		t.Fatalf("expected numeric request id in response, got %T (%+v)", payload["id"], payload)
+	}
+	if id != 7 {
+		t.Fatalf("expected id 7, got %+v", payload)
 	}
 }

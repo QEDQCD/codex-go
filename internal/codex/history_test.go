@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -73,6 +74,43 @@ func TestReadHistory_RealFile(t *testing.T) {
 		t.Skipf("no readable session files found: %v", err)
 	}
 	t.Logf("read %d messages from session %s", len(msgs), sessionID)
+}
+
+func TestReadHistory_DeduplicatesAdjacentEventAndResponseMessages(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "history-*.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	content := strings.Join([]string{
+		`{"timestamp":"2026-04-24T06:51:17.960Z","type":"response_item","payload":{"type":"message","role":"user","content":"ai热点监控"}}`,
+		`{"timestamp":"2026-04-24T06:51:17.960Z","type":"event_msg","payload":{"type":"user_message","message":"ai热点监控"}}`,
+		`{"timestamp":"2026-04-24T06:51:29.766Z","type":"event_msg","payload":{"type":"agent_message","message":"我先读取这两个技能的工作流"}}`,
+		`{"timestamp":"2026-04-24T06:51:29.767Z","type":"response_item","payload":{"type":"message","role":"assistant","content":"我先读取这两个技能的工作流"}}`,
+		`{"timestamp":"2026-04-24T06:51:33.320Z","type":"response_item","payload":{"type":"function_call_output","output":"tool output"}}`,
+	}, "\n")
+	if _, err := f.WriteString(content + "\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	msgs, err := ReadHistory(f.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := len(msgs), 3; got != want {
+		t.Fatalf("expected %d messages after dedupe, got %d: %#v", want, got, msgs)
+	}
+	if msgs[0].Role != "user" || msgs[0].Content != "ai热点监控" {
+		t.Fatalf("unexpected first message: %#v", msgs[0])
+	}
+	if msgs[1].Role != "assistant" || msgs[1].Content != "我先读取这两个技能的工作流" {
+		t.Fatalf("unexpected second message: %#v", msgs[1])
+	}
+	if msgs[2].Role != "tool_result" || msgs[2].ToolResult != "tool output" {
+		t.Fatalf("unexpected third message: %#v", msgs[2])
+	}
 }
 
 func TestConvertHistoryLine_User(t *testing.T) {

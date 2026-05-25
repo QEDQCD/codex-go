@@ -283,6 +283,50 @@ func TestWechatVisibleSessionsMatchesStartedAtForNoResumeProcess(t *testing.T) {
 	}
 }
 
+func TestWechatVisibleSessionsPrefersStoreSessionOverSyntheticForNewActiveProcess(t *testing.T) {
+	startedAt := time.Date(2026, 5, 20, 5, 55, 14, 0, time.UTC)
+	sessions := []store.Session{
+		{
+			ID:           "019e43f3-d701-7df2-afbd-d70e9b5030fe",
+			Seq:          2001,
+			Name:         "web-start-repro",
+			WorkDir:      "/root/liwenjian/codex-go",
+			Status:       "active",
+			LastActiveAt: startedAt.Add(2 * time.Second),
+		},
+		{
+			ID:           "older-same-workdir",
+			Seq:          2000,
+			Name:         "older",
+			WorkDir:      "/root/liwenjian/codex-go",
+			Status:       "stopped",
+			LastActiveAt: startedAt.Add(-1 * time.Hour),
+		},
+	}
+	activeID := "019e43f3-d701-7df2-afbd-d70e9b5030fe"
+	activeSess := &codex.Session{
+		ID:      activeID,
+		Name:    "web-start-repro",
+		WorkDir: "/root/liwenjian/codex-go",
+		Model:   "gpt-5.4",
+		Status:  codex.StatusActive,
+	}
+	runningRefs := []runningCodexRef{
+		{WorkDir: "/root/liwenjian/codex-go", StartedAt: startedAt},
+	}
+
+	visible := wechatVisibleSessions(sessions, activeID, activeSess, nil, runningRefs)
+	if len(visible) != 1 {
+		t.Fatalf("expected exactly one visible session, got %d: %+v", len(visible), visible)
+	}
+	if visible[0].ID != activeID {
+		t.Fatalf("expected store-backed active session %q, got %+v", activeID, visible[0])
+	}
+	if strings.HasPrefix(visible[0].ID, "running-") {
+		t.Fatalf("expected real session instead of synthetic running session, got %+v", visible[0])
+	}
+}
+
 func TestWechatVisibleSessionsMatchesUniqueNoResumeProcessWithoutWorkDir(t *testing.T) {
 	startedAt := time.Date(2026, 4, 17, 10, 45, 0, 0, time.UTC)
 	discovered := []codex.HistorySession{

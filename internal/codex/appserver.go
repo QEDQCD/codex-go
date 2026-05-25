@@ -22,13 +22,18 @@ type appServerClient struct {
 	mu      sync.Mutex
 	nextID  int
 	pending map[string]chan appServerResponse
-	request map[string]string
+	request map[string]appServerRequestState
 	closed  bool
 
 	events         chan Event
 	onTurnComplete func()
 	stderrMu       sync.Mutex
 	stderrBuf      bytes.Buffer
+}
+
+type appServerRequestState struct {
+	method string
+	rawID  interface{}
 }
 
 type appServerResponse struct {
@@ -73,7 +78,7 @@ func startAppServer(cliPath string, env []string, events chan Event) (*appServer
 		stderr:  stderr,
 		nextID:  1,
 		pending: make(map[string]chan appServerResponse),
-		request: make(map[string]string),
+		request: make(map[string]appServerRequestState),
 		events:  events,
 	}
 	go c.readStdout()
@@ -139,7 +144,14 @@ func (c *appServerClient) notify(method string, params map[string]interface{}) e
 }
 
 func (c *appServerClient) respond(requestID string, result map[string]interface{}) error {
-	if err := c.writeJSON(map[string]interface{}{"id": requestID, "result": result}); err != nil {
+	rawID := interface{}(requestID)
+	c.mu.Lock()
+	if req, ok := c.request[requestID]; ok && req.rawID != nil {
+		rawID = req.rawID
+	}
+	c.mu.Unlock()
+
+	if err := c.writeJSON(map[string]interface{}{"id": rawID, "result": result}); err != nil {
 		return err
 	}
 	c.mu.Lock()
@@ -151,7 +163,7 @@ func (c *appServerClient) respond(requestID string, result map[string]interface{
 func (c *appServerClient) requestMethod(requestID string) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.request[requestID]
+	return c.request[requestID].method
 }
 
 func (c *appServerClient) writeJSON(msg map[string]interface{}) error {
@@ -192,7 +204,7 @@ func (c *appServerClient) readStdout() {
 		}
 		if id != "" && msg.Method != "" {
 			c.mu.Lock()
-			c.request[id] = msg.Method
+			c.request[id] = appServerRequestState{method: msg.Method, rawID: msg.ID}
 			c.mu.Unlock()
 			if evt, ok := appServerRequestToEvent(id, msg.Method, msg.Params, ""); ok {
 				c.emit(evt)
@@ -395,6 +407,8 @@ func appServerRequestToEvent(requestID string, method string, params map[string]
 		return Event{Type: EventControlRequest, SessionID: threadID, RequestID: requestID, ToolName: "shell_command", ToolInput: input}, true
 	case "item/fileChange/requestApproval", "applyPatchApproval":
 		return Event{Type: EventControlRequest, SessionID: threadID, RequestID: requestID, ToolName: "file_change", ToolInput: input}, true
+	case "item/permissions/requestApproval":
+		return Event{Type: EventControlRequest, SessionID: threadID, RequestID: requestID, ToolName: "permissions_request", ToolInput: input}, true
 	case "item/tool/requestUserInput":
 		return Event{Type: EventControlRequest, SessionID: threadID, RequestID: requestID, ToolName: "request_user_input", ToolInput: input}, true
 	}
@@ -403,6 +417,22 @@ func appServerRequestToEvent(requestID string, method string, params map[string]
 
 func buildAppServerPermissionResponse(method string, allow bool, answer string, toolInput map[string]interface{}) map[string]interface{} {
 	switch method {
+	case "item/permissions/requestApproval":
+		granted := map[string]interface{}{}
+		if allow && toolInput != nil {
+			if requested, ok := toolInput["permissions"].(map[string]interface{}); ok {
+				if network := requested["network"]; network != nil {
+					granted["network"] = network
+				}
+				if fileSystem := requested["fileSystem"]; fileSystem != nil {
+					granted["fileSystem"] = fileSystem
+				}
+			}
+		}
+		return map[string]interface{}{
+			"permissions": granted,
+			"scope":       "turn",
+		}
 	case "item/tool/requestUserInput":
 		answers := map[string]interface{}{}
 		if toolInput != nil {

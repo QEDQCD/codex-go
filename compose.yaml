@@ -7,7 +7,7 @@ services:
     container_name: codex-go
     restart: unless-stopped
     init: true
-    working_dir: /root/liwenjian/codex-go
+    working_dir: /root/code/codex-go
     network_mode: host
     pid: host
     environment:
@@ -19,5 +19,5 @@ services:
     volumes:
       - ${HOST_CODEX_HOME:-/root/.codex}:/root/.codex
       - ${HOST_CODEX_GO_HOME:-/root/.codex-go}:/root/.codex-go
-      - ${HOST_WORKSPACE_ROOT:-/root/liwenjian}:/root/liwenjian
+      - ${HOST_WORKSPACE_ROOT:-/root/code}:/root/code
       - /etc/pki:/etc/pki:ro

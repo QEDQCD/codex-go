@@ -91,3 +91,25 @@ html, body, #root {
   transform: translateX(20px);
   background: #4edea3;
 }
+
+/* Login page background */
+.login-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 40%, rgba(78, 222, 163, 0.15), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 20%, rgba(190, 198, 224, 0.12), transparent),
+    radial-gradient(ellipse 50% 40% at 60% 80%, rgba(255, 185, 95, 0.08), transparent),
+    linear-gradient(160deg, #000f21 0%, #031427 40%, #0b1c30 100%);
+}
+
+.login-bg-mobile {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(78, 222, 163, 0.12), transparent),
+    linear-gradient(180deg, #000f21 0%, #031427 100%);
+}
+
+.login-grid {
+  background-image:
+    linear-gradient(rgba(190, 198, 224, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(190, 198, 224, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}

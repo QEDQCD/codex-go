@@ -20,6 +20,11 @@ type SkillConfig struct {
 	Builtin     bool   `json:"builtin"`
 }
 
+type WebAuthConfig struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 type Config struct {
 	CodexCLIPath     string        `json:"codex_cli_path"`
 	AutoFindCodex    bool          `json:"auto_find_codex"`
@@ -29,6 +34,7 @@ type Config struct {
 	AutoOpenBrowser  bool          `json:"auto_open_browser"`
 	AutoResumeLatest bool          `json:"auto_resume_latest"`
 	CodexEnvVars     string        `json:"codex_env_vars"`
+	WebAuth          WebAuthConfig `json:"web_auth"`
 	Wechat           WechatConfig  `json:"wechat"`
 	PushTypes        []string      `json:"push_types"`
 	BotCommands      []BotCommand  `json:"bot_commands"`
@@ -88,6 +94,18 @@ func (w WechatConfig) Normalize() WechatConfig {
 	return w
 }
 
+func (c *Config) WebAuthCredentials() (string, string) {
+	u := c.WebAuth.Username
+	p := c.WebAuth.Password
+	if u == "" {
+		u = "admin"
+	}
+	if p == "" {
+		p = "admin123"
+	}
+	return u, p
+}
+
 func DefaultConfig() *Config {
 	return &Config{
 		CodexCLIPath:    "",
@@ -96,6 +114,10 @@ func DefaultConfig() *Config {
 		Language:        "zh-CN",
 		WebPort:         18080,
 		AutoOpenBrowser: true,
+		WebAuth: WebAuthConfig{
+			Username: "admin",
+			Password: "admin123",
+		},
 		Wechat: WechatConfig{
 			BotToken:                  "",
 			BaseURL:                   "https://ilinkai.weixin.qq.com",

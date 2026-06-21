@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
+import { AuthProvider, useAuth } from './auth'
 import SideNavBar from './components/SideNavBar'
 import TopAppBar from './components/TopAppBar'
 import Dashboard from './pages/Dashboard'
@@ -8,6 +9,7 @@ import SessionChat from './pages/SessionChat'
 import LogViewer from './pages/LogViewer'
 import WechatBind from './pages/WechatBind'
 import Settings from './pages/Settings'
+import Login from './pages/Login'
 
 function Shell() {
   const navigate = useNavigate()
@@ -35,20 +37,48 @@ function Shell() {
   )
 }
 
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background text-on-surface-variant">
+        <span className="material-symbols-outlined animate-spin text-[32px]">progress_activity</span>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Shell />}>
-          <Route index element={<Dashboard />} />
-          <Route path="sessions" element={<SessionList />} />
-          <Route path="sessions/:id" element={<SessionChat />} />
-          <Route path="log" element={<LogViewer />} />
-          <Route path="wechat" element={<WechatBind />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/"
+            element={
+              <RequireAuth>
+                <Shell />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="sessions" element={<SessionList />} />
+            <Route path="sessions/:id" element={<SessionChat />} />
+            <Route path="log" element={<LogViewer />} />
+            <Route path="wechat" element={<WechatBind />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }

@@ -2,6 +2,7 @@ const BASE = '/api/v1'
 
 async function request(path: string, options?: RequestInit) {
   const res = await fetch(`${BASE}${path}`, {
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   })
@@ -17,6 +18,10 @@ async function request(path: string, options?: RequestInit) {
 }
 
 export const api = {
+  login: (username: string, password: string) =>
+    request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  me: () => request('/auth/me'),
   getStats: () => request('/stats'),
   getQRCode: () => request('/wechat/qrcode'),
   getWechatStatus: () => request('/wechat/status'),

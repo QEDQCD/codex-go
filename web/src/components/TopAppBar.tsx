@@ -1,4 +1,5 @@
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth'
 
 const routeLabels: Record<string, string> = {
   '': '仪表板',
@@ -10,6 +11,8 @@ const routeLabels: Record<string, string> = {
 
 export default function TopAppBar() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const segments = location.pathname.split('/').filter(Boolean)
 
   const crumbs: { label: string; path: string }[] = []
@@ -62,8 +65,16 @@ export default function TopAppBar() {
         <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-variant text-on-surface-variant transition-colors">
           <span className="material-symbols-outlined">notifications</span>
         </button>
-        <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-variant text-on-surface-variant transition-colors">
-          <span className="material-symbols-outlined">account_circle</span>
+        <button
+          onClick={async () => {
+            await logout()
+            navigate('/login')
+          }}
+          className="flex items-center gap-2 px-3 py-1 rounded hover:bg-surface-variant text-on-surface-variant transition-colors"
+          title="退出登录"
+        >
+          <span className="material-symbols-outlined text-[20px]">account_circle</span>
+          <span className="text-[12px] hidden sm:inline">{user}</span>
         </button>
       </div>
     </header>

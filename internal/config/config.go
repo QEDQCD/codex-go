@@ -1,7 +1,9 @@
 package config
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"math/big"
 	"os"
 	"path/filepath"
 )
@@ -100,10 +102,39 @@ func (c *Config) WebAuthCredentials() (string, string) {
 	if u == "" {
 		u = "admin"
 	}
-	if p == "" {
-		p = "admin123"
-	}
 	return u, p
+}
+
+func (c *Config) ensureWebAuth() bool {
+	changed := false
+	if c.WebAuth.Username == "" {
+		c.WebAuth.Username = "admin"
+		changed = true
+	}
+	if c.WebAuth.Password == "" {
+		password, err := generateWebAuthPassword()
+		if err != nil {
+			return changed
+		}
+		c.WebAuth.Password = password
+		changed = true
+	}
+	return changed
+}
+
+func generateWebAuthPassword() (string, error) {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+	const length = 16
+	buf := make([]byte, length)
+	max := big.NewInt(int64(len(chars)))
+	for i := range buf {
+		n, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", err
+		}
+		buf[i] = chars[n.Int64()]
+	}
+	return string(buf), nil
 }
 
 func DefaultConfig() *Config {
@@ -116,7 +147,6 @@ func DefaultConfig() *Config {
 		AutoOpenBrowser: true,
 		WebAuth: WebAuthConfig{
 			Username: "admin",
-			Password: "admin123",
 		},
 		Wechat: WechatConfig{
 			BotToken:                  "",
@@ -191,6 +221,7 @@ func Load() (*Config, error) {
 		if os.IsNotExist(err) {
 			SeedDefaultSkills()
 			cfg := DefaultConfig()
+			cfg.ensureWebAuth()
 			cfg.Skills = ensureSkills(cfg.Skills)
 			return cfg, cfg.Save()
 		}
@@ -205,6 +236,11 @@ func Load() (*Config, error) {
 	cfg.PushTypes = ensurePermission(cfg.PushTypes)
 	cfg.BotCommands = ensureBotCommands(cfg.BotCommands)
 	cfg.Skills = ensureSkills(cfg.Skills)
+	if cfg.ensureWebAuth() {
+		if err := cfg.Save(); err != nil {
+			return nil, err
+		}
+	}
 	return &cfg, nil
 }
 

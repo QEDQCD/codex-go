@@ -24,9 +24,12 @@ Thumbs.db
 web/node_modules/
 cmd/codex-go/web-dist/
 
-# Config (user-specific)
+# Config (user-specific, includes web_auth credentials)
 .cc-go/
 .codex-go/
+web_auth.json
+**/web_auth.local.json
+config.local.json
 
 # Docs (local only)
 docs/stitch_cc_go_remote_manager/

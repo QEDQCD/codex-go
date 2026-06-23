@@ -135,7 +135,7 @@ export default function Login() {
             </form>
 
             <p className="mt-6 text-center text-[12px] text-on-surface-variant/70">
-              默认账号 admin / admin123，可在 config.json 中修改
+              默认账号 admin，密码见 config.json 中 web_auth 配置
             </p>
           </div>
         </div>

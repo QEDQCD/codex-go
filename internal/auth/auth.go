@@ -14,8 +14,7 @@ const (
 	cookieName     = "codex_go_session"
 	sessionTTL     = 7 * 24 * time.Hour
 	sessionBytes   = 32
-	defaultUser    = "admin"
-	defaultPass    = "admin123"
+	defaultUser = "admin"
 )
 
 type Manager struct {
@@ -29,9 +28,6 @@ type Manager struct {
 func New(username, password string) *Manager {
 	if username == "" {
 		username = defaultUser
-	}
-	if password == "" {
-		password = defaultPass
 	}
 	return &Manager{
 		username: username,

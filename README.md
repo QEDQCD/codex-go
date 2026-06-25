@@ -10,6 +10,7 @@
 [![Made with React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![WeChat](https://img.shields.io/badge/WeChat-Enabled-07C160?style=flat-square&logo=wechat&logoColor=white)](https://weixin.qq.com/)
 [![Powered by Codex](https://img.shields.io/badge/AI-Codex-FF6B35?style=flat-square&logo=openai&logoColor=white)](https://openai.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
 codex-go 是一款基于 [Codex](https://openai.com/) 的远程编码工具。通过微信机器人接管 Codex 会话，你可以在手机上批准权限请求、查看 AI 回复、启动/切换会话，真正做到随时随地编码。内置 Skills 自动注入和微信通知通道，Codex 可以主动向你的微信推送消息。
 
@@ -24,6 +25,7 @@ codex-go 是一款基于 [Codex](https://openai.com/) 的远程编码工具。�
 - [配置说明](#配置说明)
 - [系统架构](#系统架构)
 - [技术栈](#技术栈)
+- [许可证](#许可证)
 
 ## 快速开始
 
@@ -169,3 +171,7 @@ codex-go 提供本地 HTTP API，供外部应用通过 codex-go 发送微信消�
 - **协议**: Codex JSON-RPC / stream-json（标准输入/输出）
 - **微信接入**: iLink Bot API（`ilinkai.weixin.qq.com`）
 - **数据存储**: BoltDB（嵌入式键值数据库）
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE) 开源协议。
